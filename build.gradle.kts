@@ -1,8 +1,10 @@
+import com.moowork.gradle.node.npm.NpmTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.springframework.boot") version "2.3.4.RELEASE"
     id("io.spring.dependency-management") version "1.0.10.RELEASE"
+    id("com.github.node-gradle.node") version "2.2.2"
     kotlin("jvm") version "1.3.72"
     kotlin("plugin.spring") version "1.3.72"
     kotlin("plugin.jpa") version "1.3.72"
@@ -41,7 +43,38 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.register<NpmTask>("appNpmInstall") {
+    description = "Installs all dependencies from package.json"
+    workingDir = file("${project.projectDir}/src/main/webapp")
+    args = listOf("install")
+}
+
+tasks.register<NpmTask>("appNpmBuild") {
+    dependsOn("appNpmInstall")
+    description = "Builds project"
+    workingDir = file("${project.projectDir}/src/main/webapp")
+    args = listOf("run", "build")
+}
+
+tasks.register<Copy>("copyWebApp") {
+    dependsOn("appNpmBuild")
+    description = "Copies built project to where it will be served"
+    from("src/main/webapp/build")
+    into("build/resources/main/static/.")
+}
+
+node {
+    download = true
+    version = "12.13.1"
+    npmVersion = "6.12.1"
+    // Set the work directory for unpacking node
+    workDir = file("${project.buildDir}/nodejs")
+    // Set the work directory for NPM
+    npmWorkDir = file("${project.buildDir}/npm")
+}
+
 tasks.withType<KotlinCompile> {
+    dependsOn("copyWebApp")
     kotlinOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
         jvmTarget = "1.8"
